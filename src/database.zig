@@ -65,6 +65,7 @@ pub const DB = struct {
         errdefer cf_map.destroy();
         for (cf_list, 0..) |*cf, i| {
             const name = try allocator.dupe(u8, column_families[i].name);
+            errdefer allocator.free(name);
             cf.* = .{
                 .name = name,
                 .handle = cf_handles[i].?,
@@ -351,6 +352,35 @@ pub const DBOptions = struct {
         return ro;
     }
 };
+
+test "DB clean init and deinit" {
+    const ns = struct {
+        pub fn run(allocator: Allocator) !void {
+            var dir = std.testing.tmpDir(.{});
+            defer dir.cleanup();
+            const path = try dir.dir.realpathAlloc(allocator, ".");
+            defer allocator.free(path);
+
+            var data: ?Data = null;
+            const db, const cfs = try DB.open(
+                allocator,
+                path,
+                .{
+                    .create_if_missing = true,
+                    .create_missing_column_families = true,
+                },
+                null,
+                &data,
+            );
+
+            db.deinit();
+            allocator.free(cfs);
+        }
+    };
+
+    try ns.run(std.testing.allocator);
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, ns.run, .{});
+}
 
 test "DBOptions defaults" {
     try testDBOptions(DBOptions{}, rdb.rocksdb_options_create().?);
