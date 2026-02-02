@@ -23,9 +23,11 @@ pub fn build(b: *Build) !void {
     bindings_mod.addImport("rocksdb", rocksdb_mod);
 
     const tests = b.addTest(.{
-        .target = target,
-        .optimize = optimize,
-        .root_source_file = b.path("src/lib.zig"),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/lib.zig"),
+        }),
     });
     const test_step = b.step("test", "Run bindings tests");
     tests.root_module.addImport("rocksdb", rocksdb_mod);

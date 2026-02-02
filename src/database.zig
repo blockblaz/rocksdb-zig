@@ -266,11 +266,11 @@ pub const DB = struct {
     pub fn liveFiles(self: *const Self, allocator: Allocator) Allocator.Error!std.ArrayList(LiveFile) {
         const files = rdb.rocksdb_livefiles(self.db).?;
         const num_files: usize = @intCast(rdb.rocksdb_livefiles_count(files));
-        var livefiles = std.ArrayList(LiveFile).init(allocator);
+        var livefiles: std.ArrayList(LiveFile) = .empty;
         var key_size: usize = 0;
         for (0..num_files) |i| {
             const file_num: c_int = @intCast(i);
-            try livefiles.append(.{
+            try livefiles.append(allocator, .{
                 .allocator = allocator,
                 .column_family_name = try copy(allocator, rdb.rocksdb_livefiles_column_family_name(files, file_num)),
                 .name = try copy(allocator, rdb.rocksdb_livefiles_name(files, file_num)),
@@ -553,7 +553,7 @@ test DB {
     var err_str: ?Data = null;
     defer if (err_str) |e| e.deinit();
     runTest(&err_str) catch |e| {
-        std.debug.print("{}: {?}\n", .{ e, err_str });
+        std.debug.print("{}: {?f}\n", .{ e, err_str });
         return e;
     };
 }
@@ -616,8 +616,8 @@ fn runTest(err_str: *?Data) !void {
     );
     defer db.deinit();
     defer std.testing.allocator.free(families);
-    const lfs = try db.liveFiles(std.testing.allocator);
-    defer lfs.deinit();
+    var lfs = try db.liveFiles(std.testing.allocator);
+    defer lfs.deinit(std.testing.allocator);
     defer for (lfs.items) |lf| lf.deinit();
     try std.testing.expect(std.mem.eql(u8, "another", lfs.items[0].column_family_name));
 }
