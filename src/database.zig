@@ -3,7 +3,20 @@ const rdb = @import("rocksdb");
 const lib = @import("lib.zig");
 
 const Allocator = std.mem.Allocator;
-const RwLock = std.Thread.RwLock;
+
+const SpinMutex = struct {
+    locked: std.atomic.Value(bool) = .init(false),
+
+    fn lock(self: *SpinMutex) void {
+        while (self.locked.swap(true, .acquire)) {
+            std.atomic.spinLoopHint();
+        }
+    }
+
+    fn unlock(self: *SpinMutex) void {
+        self.locked.store(false, .release);
+    }
+};
 
 const Data = lib.Data;
 const Iterator = lib.Iterator;
@@ -374,7 +387,7 @@ test "DB clean init and deinit" {
         pub fn run(allocator: Allocator) !void {
             var dir = std.testing.tmpDir(.{});
             defer dir.cleanup();
-            const path = try dir.dir.realpathAlloc(allocator, ".");
+            const path = try std.fmt.allocPrint(allocator, ".zig-cache/tmp/{s}", .{dir.sub_path});
             defer allocator.free(path);
 
             var data: ?Data = null;
@@ -509,7 +522,7 @@ const CallHandler = struct {
 const CfNameToHandleMap = struct {
     allocator: Allocator,
     map: std.StringHashMapUnmanaged(ColumnFamilyHandle),
-    lock: RwLock,
+    lock: SpinMutex,
 
     const Self = @This();
 
@@ -543,8 +556,8 @@ const CfNameToHandleMap = struct {
     }
 
     fn get(self: *Self, name: []const u8) ?ColumnFamilyHandle {
-        self.lock.lockShared();
-        defer self.lock.unlockShared();
+        self.lock.lock();
+        defer self.lock.unlock();
         return self.map.get(name);
     }
 };

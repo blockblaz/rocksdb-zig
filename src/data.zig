@@ -12,7 +12,7 @@ pub const Data = struct {
         self.free(@ptrCast(@constCast(self.data.ptr)));
     }
 
-    pub fn format(self: @This(), writer: *std.io.Writer) std.io.Writer.Error!void {
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.writeAll(self.data);
     }
 };

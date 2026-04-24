@@ -2,3 +2,5 @@
 /zig-out
 /test-state
 /.vscode
+zig-pkg
+.tool-versions
